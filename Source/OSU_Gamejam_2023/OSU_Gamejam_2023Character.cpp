@@ -7,14 +7,15 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "MyCharacterMovementComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
-
 
 //////////////////////////////////////////////////////////////////////////
 // AOSU_Gamejam_2023Character
 
-AOSU_Gamejam_2023Character::AOSU_Gamejam_2023Character()
+AOSU_Gamejam_2023Character::AOSU_Gamejam_2023Character(const FObjectInitializer& ObjectInitializer)
+	:Super(ObjectInitializer.SetDefaultSubobjectClass<UMyCharacterMovementComponent>(ACharacter::CharacterMovementComponentName))
 {
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
@@ -49,6 +50,7 @@ AOSU_Gamejam_2023Character::AOSU_Gamejam_2023Character()
 
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
+	MovementComponent = Cast<UMyCharacterMovementComponent>(GetCharacterMovement()); // <--
 }
 
 void AOSU_Gamejam_2023Character::BeginPlay()
@@ -64,6 +66,33 @@ void AOSU_Gamejam_2023Character::BeginPlay()
 			Subsystem->AddMappingContext(DefaultMappingContext, 0);
 		}
 	}
+}
+
+void AOSU_Gamejam_2023Character::Climb(const FInputActionValue& Value)
+{
+	bool climb = Value.Get<bool>();
+	if (climb) {
+		if (MovementComponent->IsClimbing()) {
+			MovementComponent->CancelClimbing();
+		}
+		else {
+			MovementComponent->TryClimbing();
+		}
+			
+	}
+	
+}
+
+void AOSU_Gamejam_2023Character::CancelClimb(const FInputActionValue& Value)
+{
+	bool climb = Value.Get<bool>();
+
+	if (climb) {
+		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, TEXT("Some debug message!"));
+		MovementComponent->CancelClimbing();
+	}
+
+	
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -84,6 +113,10 @@ void AOSU_Gamejam_2023Character::SetupPlayerInputComponent(class UInputComponent
 		//Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AOSU_Gamejam_2023Character::Look);
 
+		//Climbing
+		EnhancedInputComponent->BindAction(ClimbAction, ETriggerEvent::Triggered, this, &AOSU_Gamejam_2023Character::Climb);
+		//EnhancedInputComponent->BindAction(ClimbAction, ETriggerEvent::Triggered, this, &AOSU_Gamejam_2023Character::CancelClimb);
+
 	}
 
 }
@@ -96,16 +129,25 @@ void AOSU_Gamejam_2023Character::Move(const FInputActionValue& Value)
 	if (Controller != nullptr)
 	{
 		// find out which way is forward
-		const FRotator Rotation = Controller->GetControlRotation();
-		const FRotator YawRotation(0, Rotation.Yaw, 0);
+		FRotator Rotation = Controller->GetControlRotation();
+		FRotator YawRotation(0, Rotation.Yaw, 0);
 
 		// get forward vector
-		const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+		FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
 	
 		// get right vector 
-		const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+		FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 
 		// add movement 
+
+		if (MovementComponent->IsClimbing())
+		{
+			ForwardDirection = FVector::CrossProduct(MovementComponent->GetClimbSurfaceNormal(), -GetActorRightVector());
+
+			RightDirection = FVector::CrossProduct(MovementComponent->GetClimbSurfaceNormal(), GetActorUpVector());
+			
+
+		}
 		AddMovementInput(ForwardDirection, MovementVector.Y);
 		AddMovementInput(RightDirection, MovementVector.X);
 	}
