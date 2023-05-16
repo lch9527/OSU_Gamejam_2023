@@ -72,8 +72,13 @@ void AOSU_Gamejam_2023Character::Climb(const FInputActionValue& Value)
 {
 	bool climb = Value.Get<bool>();
 	if (climb) {
-		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, TEXT("Some debug message!"));
-		MovementComponent->TryClimbing();
+		if (MovementComponent->IsClimbing()) {
+			MovementComponent->CancelClimbing();
+		}
+		else {
+			MovementComponent->TryClimbing();
+		}
+			
 	}
 	
 }
@@ -110,7 +115,7 @@ void AOSU_Gamejam_2023Character::SetupPlayerInputComponent(class UInputComponent
 
 		//Climbing
 		EnhancedInputComponent->BindAction(ClimbAction, ETriggerEvent::Triggered, this, &AOSU_Gamejam_2023Character::Climb);
-		EnhancedInputComponent->BindAction(ClimbAction, ETriggerEvent::Completed, this, &AOSU_Gamejam_2023Character::CancelClimb);
+		//EnhancedInputComponent->BindAction(ClimbAction, ETriggerEvent::Triggered, this, &AOSU_Gamejam_2023Character::CancelClimb);
 
 	}
 
