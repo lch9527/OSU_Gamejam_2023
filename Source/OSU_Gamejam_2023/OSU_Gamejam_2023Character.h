@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "InputActionValue.h"
+#include "MyCharacterMovementComponent.h"
 #include "OSU_Gamejam_2023Character.generated.h"
 
 
@@ -37,8 +38,12 @@ class AOSU_Gamejam_2023Character : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	class UInputAction* LookAction;
 
+	/** Climb Input Action */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	class UInputAction* ClimbAction;
+
 public:
-	AOSU_Gamejam_2023Character();
+	AOSU_Gamejam_2023Character(const FObjectInitializer& ObjectInitializer);
 	
 
 protected:
@@ -57,10 +62,17 @@ protected:
 	// To add mapping context
 	virtual void BeginPlay();
 
+	void Climb(const FInputActionValue& Value);
+
+	void CancelClimb(const FInputActionValue& Value);
+
 public:
 	/** Returns CameraBoom subobject **/
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
 	/** Returns FollowCamera subobject **/
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
+
+	UPROPERTY()
+	UMyCharacterMovementComponent* MovementComponent;
 };
 
