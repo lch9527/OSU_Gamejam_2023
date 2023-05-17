@@ -178,9 +178,9 @@ FCollisionQueryParams AOSU_Gamejam_2023Character::GetIgnoreCharacterParams()
 {
 	FCollisionQueryParams Params;
 
-	TArray<AActor*> CharacterChildren;
-	GetAllChildActors(CharacterChildren);
-	Params.AddIgnoredActors(CharacterChildren);
+	//TArray<AActor*> CharacterChildren;
+	//GetAllChildActors(CharacterChildren);
+	//Params.AddIgnoredActors(CharacterChildren);
 	Params.AddIgnoredActor(this);
 
 	return Params;
