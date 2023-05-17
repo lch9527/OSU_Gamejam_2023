@@ -5,9 +5,9 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "InputActionValue.h"
-#include "MyCharacterMovementComponent.h"
 #include "OSU_Gamejam_2023Character.generated.h"
 
+class UMyCharacterMovementComponent;
 class URadialForceComponent;
 
 UCLASS(config=Game)
@@ -61,7 +61,7 @@ public:
 
 	FHitResult HookHit;
 	FHitResult* tmp_hit;
-	
+	FCollisionQueryParams GetIgnoreCharacterParams();
 
 protected:
 

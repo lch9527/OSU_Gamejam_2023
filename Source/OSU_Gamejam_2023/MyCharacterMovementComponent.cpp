@@ -2,7 +2,7 @@
 
 
 #include "MyCharacterMovementComponent.h"
-
+#include "OSU_Gamejam_2023Character.h"
 #include "ECustomMovement.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/Character.h"
@@ -11,6 +11,11 @@ UMyCharacterMovementComponent::UMyCharacterMovementComponent(const FObjectInitia
 	: Super(ObjectInitializer)
 {
 
+}
+
+bool UMyCharacterMovementComponent::IsWallRunning()
+{
+	return MovementMode == EMovementMode::MOVE_Custom && CustomMovementMode == ECustomMovementMode::CMOVE_WallRun;
 }
 
 void UMyCharacterMovementComponent::BeginPlay()
@@ -124,6 +129,15 @@ void UMyCharacterMovementComponent::OnMovementModeChanged(EMovementMode Previous
 		StopMovementImmediately();
 	}
 
+	if (IsWallRunning() && GetOwnerRole() == ROLE_SimulatedProxy)
+	{
+		FVector Start = UpdatedComponent->GetComponentLocation();
+		FVector End = Start + UpdatedComponent->GetRightVector() * CapR() * 2;
+		auto Params = ZippyCharacterOwner->GetIgnoreCharacterParams();
+		FHitResult WallHit;
+		Safe_bWallRunIsRight = GetWorld()->LineTraceSingleByProfile(WallHit, Start, End, "BlockAll", Params);
+	}
+
 	Super::OnMovementModeChanged(PreviousMovementMode, PreviousCustomMode);
 }
 
@@ -142,6 +156,10 @@ void UMyCharacterMovementComponent::PhysCustom(float deltaTime, int32 Iterations
 	else if (CustomMovementMode == ECustomMovementMode::CMOVE_Hooking) 
 	{
 		PhysFlying(deltaTime, Iterations);
+	}
+	else if (CustomMovementMode == ECustomMovementMode::CMOVE_WallRun)
+	{
+		PhysWallRun(deltaTime, Iterations);
 	}
 
 	Super::PhysCustom(deltaTime, Iterations);
@@ -463,6 +481,176 @@ void UMyCharacterMovementComponent::StoreClimbDashDirection()
 void UMyCharacterMovementComponent::CancelClimbing()
 {
 	bWantsToClimb = false;
+}
+
+void UMyCharacterMovementComponent::UpdateCharacterStateBeforeMovement(float DeltaSeconds)
+{
+	if (IsFalling() || IsFlying())
+	{
+		TryWallRun();
+	}
+
+	Super::UpdateCharacterStateBeforeMovement(DeltaSeconds);
+}
+
+bool UMyCharacterMovementComponent::TryWallRun()
+{
+	
+	if (!IsFalling()) return false;
+	
+	if (Velocity.SizeSquared2D() < pow(MinWallRunSpeed, 2)) return false;
+	
+	if (Velocity.Z < -MaxVerticalWallRunSpeed) return false;
+	
+	FVector Start = UpdatedComponent->GetForwardVector()*50 + UpdatedComponent->GetComponentLocation();
+	FVector LeftEnd = Start - UpdatedComponent->GetRightVector() * CapR() * 2;
+	FVector RightEnd = Start + UpdatedComponent->GetRightVector() * CapR() * 2;
+	auto Params = ZippyCharacterOwner->GetIgnoreCharacterParams();
+	FHitResult FloorHit, WallHit;
+	 //Check Player Height
+	if (GetWorld()->LineTraceSingleByProfile(FloorHit, Start, Start + FVector::DownVector * (CapHH() + MinWallRunHeight), "BlockAll", Params))
+	{
+		return false;
+	}
+
+	
+	// Left Cast
+	GetWorld()->LineTraceSingleByChannel(WallHit, Start, LeftEnd, ECC_WorldStatic, Params);
+	//DrawDebugLine(GetWorld(), Start, LeftEnd, FColor::Red, false, 1, 0, 5);
+	if (WallHit.bBlockingHit)
+	{
+		Safe_bWallRunIsRight = false;
+		FVector ProjectedVelocity = FVector::VectorPlaneProject(Velocity, WallHit.Normal);
+		Velocity = ProjectedVelocity;
+		Velocity.Z = FMath::Clamp(Velocity.Z, 0.f, MaxVerticalWallRunSpeed);
+
+		SetMovementMode(EMovementMode::MOVE_Custom, ECustomMovementMode::CMOVE_WallRun);
+		return true;
+	}
+	// Right Cast
+	else
+	{
+		GetWorld()->LineTraceSingleByChannel(WallHit, Start, RightEnd, ECC_WorldStatic, Params);
+		if (WallHit.bBlockingHit)
+		{
+			Safe_bWallRunIsRight = true;
+			FVector ProjectedVelocity = FVector::VectorPlaneProject(Velocity, WallHit.Normal);
+			Velocity = ProjectedVelocity;
+			Velocity.Z = FMath::Clamp(Velocity.Z, 0.f, MaxVerticalWallRunSpeed);
+			
+			SetMovementMode(EMovementMode::MOVE_Custom, ECustomMovementMode::CMOVE_WallRun);
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
+void UMyCharacterMovementComponent::PhysWallRun(float deltaTime, int32 Iterations)
+{
+	if (deltaTime < MIN_TICK_TIME)
+	{
+		return;
+	}
+	if (!CharacterOwner || (!CharacterOwner->Controller && !bRunPhysicsWithNoController && !HasAnimRootMotion() && !CurrentRootMotion.HasOverrideVelocity() && (CharacterOwner->GetLocalRole() != ROLE_SimulatedProxy)))
+	{
+		Acceleration = FVector::ZeroVector;
+		Velocity = FVector::ZeroVector;
+		return;
+	}
+
+	bJustTeleported = false;
+	float remainingTime = deltaTime;
+	// Perform the move
+	while ((remainingTime >= MIN_TICK_TIME) && (Iterations < MaxSimulationIterations) && CharacterOwner && (CharacterOwner->Controller || bRunPhysicsWithNoController || (CharacterOwner->GetLocalRole() == ROLE_SimulatedProxy)))
+	{
+		Iterations++;
+		bJustTeleported = false;
+		const float timeTick = GetSimulationTimeStep(remainingTime, Iterations);
+		remainingTime -= timeTick;
+		const FVector OldLocation = UpdatedComponent->GetComponentLocation();
+
+		FVector Start = UpdatedComponent->GetForwardVector() * 50 + UpdatedComponent->GetComponentLocation();
+		FVector CastDelta = UpdatedComponent->GetRightVector() * CapR() * 2;
+		FVector End = Safe_bWallRunIsRight ? Start + CastDelta : Start - CastDelta;
+		auto Params = ZippyCharacterOwner->GetIgnoreCharacterParams();
+		float SinPullAwayAngle = FMath::Sin(FMath::DegreesToRadians(WallRunPullAwayAngle));
+		FHitResult WallHit;
+		GetWorld()->LineTraceSingleByChannel(WallHit, Start, End, ECC_WorldStatic, Params);
+//		GetWorld()->LineTraceSingleByProfile(WallHit, Start, End, "BlockAll", Params);
+		bool bWantsToPullAway = WallHit.IsValidBlockingHit() && !Acceleration.IsNearlyZero() && (Acceleration.GetSafeNormal() | WallHit.Normal) > SinPullAwayAngle;
+		if (!WallHit.IsValidBlockingHit() || bWantsToPullAway)
+		{
+			SetMovementMode(MOVE_Falling);
+			StartNewPhysics(remainingTime, Iterations);
+			return;
+		}
+		// Clamp Acceleration
+		Acceleration = FVector::VectorPlaneProject(Acceleration, WallHit.Normal);
+		Acceleration.Z = 0.f;
+		// Apply acceleration
+		CalcVelocity(timeTick, 0.f, false, GetMaxBrakingDeceleration());
+		Velocity = FVector::VectorPlaneProject(Velocity, WallHit.Normal);
+		float TangentAccel = Acceleration.GetSafeNormal() | Velocity.GetSafeNormal2D();
+		bool bVelUp = Velocity.Z > 0.f;
+		Velocity.Z += GetGravityZ() * WallRunGravityScaleCurve->GetFloatValue(bVelUp ? 0.f : TangentAccel) * timeTick;
+		if (Velocity.SizeSquared2D() < pow(MinWallRunSpeed, 2) || Velocity.Z < -MaxVerticalWallRunSpeed)
+		{
+			SetMovementMode(MOVE_Falling);
+			StartNewPhysics(remainingTime, Iterations);
+			return;
+		}
+
+		// Compute move parameters
+		const FVector Delta = timeTick * Velocity; // dx = v * dt
+		const bool bZeroDelta = Delta.IsNearlyZero();
+		if (bZeroDelta)
+		{
+			remainingTime = 0.f;
+		}
+		else
+		{
+			FHitResult Hit;
+			SafeMoveUpdatedComponent(Delta, UpdatedComponent->GetComponentQuat(), true, Hit);
+			FVector WallAttractionDelta = -WallHit.Normal * WallAttractionForce * timeTick;
+			SafeMoveUpdatedComponent(WallAttractionDelta, UpdatedComponent->GetComponentQuat(), true, Hit);
+		}
+		if (UpdatedComponent->GetComponentLocation() == OldLocation)
+		{
+			remainingTime = 0.f;
+			break;
+		}
+		Velocity = (UpdatedComponent->GetComponentLocation() - OldLocation) / timeTick; // v = dx / dt
+	}
+
+
+	FVector Start = UpdatedComponent->GetForwardVector() * 50 + UpdatedComponent->GetComponentLocation();
+	FVector CastDelta = UpdatedComponent->GetRightVector() * CapR() * 2;
+	FVector End = Safe_bWallRunIsRight ? Start + CastDelta : Start - CastDelta;
+	auto Params = ZippyCharacterOwner->GetIgnoreCharacterParams();
+	FHitResult FloorHit, WallHit;
+
+	GetWorld()->LineTraceSingleByChannel(WallHit, Start, End, ECC_WorldStatic, Params);
+	//GetWorld()->LineTraceSingleByProfile(WallHit, Start, End, "BlockAll", Params);
+	GetWorld()->LineTraceSingleByChannel(FloorHit, Start, Start + FVector::DownVector * (CapHH() + MinWallRunHeight * .5f), ECC_WorldStatic, Params);
+	if (FloorHit.bBlockingHit || !WallHit.bBlockingHit || Velocity.SizeSquared2D() < pow(MinWallRunSpeed, 2))
+	{
+		SetMovementMode(MOVE_Falling);
+	}
+}
+
+float UMyCharacterMovementComponent::CapR() const
+{
+	return CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleRadius();
+}
+
+float UMyCharacterMovementComponent::CapHH() const
+{
+	return CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
 }
 
 FVector UMyCharacterMovementComponent::GetClimbSurfaceNormal() const

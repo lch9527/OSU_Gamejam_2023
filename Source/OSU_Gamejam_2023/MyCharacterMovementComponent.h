@@ -4,8 +4,10 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/CharacterMovementComponent.h"
+
 #include "MyCharacterMovementComponent.generated.h"
 
+class AOSU_Gamejam_2023Character;
 /**
  * 
  */
@@ -40,6 +42,27 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 		void CancelClimbing();
+
+	virtual void UpdateCharacterStateBeforeMovement(float DeltaSeconds) override;
+
+	bool TryWallRun();
+	void PhysWallRun(float deltaTime, int32 Iterations);
+	float CapR() const;
+	float CapHH() const;
+	bool Safe_bWallRunIsRight;
+
+	UPROPERTY(Transient) AOSU_Gamejam_2023Character* ZippyCharacterOwner;
+
+
+	// Wall Run
+	UPROPERTY(EditDefaultsOnly) float MinWallRunSpeed = 200.f;
+	UPROPERTY(EditDefaultsOnly) float MaxWallRunSpeed = 800.f;
+	UPROPERTY(EditDefaultsOnly) float MaxVerticalWallRunSpeed = 200.f;
+	UPROPERTY(EditDefaultsOnly) float WallRunPullAwayAngle = 75;
+	UPROPERTY(EditDefaultsOnly) float WallAttractionForce = 200.f;
+	UPROPERTY(EditDefaultsOnly) float MinWallRunHeight = 50.f;
+	UPROPERTY(EditDefaultsOnly) UCurveFloat* WallRunGravityScaleCurve;
+	UPROPERTY(EditDefaultsOnly) float WallJumpOffForce = 300.f;
 
 private:
 	UPROPERTY(Category = "Character Movement: Climbing", EditAnywhere)
@@ -101,6 +124,9 @@ private:
 	FVector CurrentClimbingPosition;
 
 private:
+
+	bool IsWallRunning();
+
 	virtual void BeginPlay() override;
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
@@ -160,5 +186,7 @@ private:
 	void ComputeSurfaceInfo();
 
 	void SweepAndStoreWallHits();
+
+
 	
 };
