@@ -8,6 +8,7 @@
 #include "MyCharacterMovementComponent.h"
 #include "OSU_Gamejam_2023Character.generated.h"
 
+class URadialForceComponent;
 
 UCLASS(config=Game)
 class AOSU_Gamejam_2023Character : public ACharacter
@@ -44,6 +45,22 @@ class AOSU_Gamejam_2023Character : public ACharacter
 
 public:
 	AOSU_Gamejam_2023Character(const FObjectInitializer& ObjectInitializer);
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Hook, meta = (AllowPrivateAccess = "true"))
+		class URadialForceComponent* Hook_force;
+
+	FCollisionQueryParams HookQueryParams;
+
+	UFUNCTION(BlueprintCallable)
+		void Try_hook();
+
+	UFUNCTION(BlueprintCallable)
+		void Stop_hook();
+
+	EObjectTypeQuery Hook_target;
+
+	FHitResult HookHit;
+	FHitResult* tmp_hit;
 	
 
 protected:
@@ -53,6 +70,8 @@ protected:
 
 	/** Called for looking input */
 	void Look(const FInputActionValue& Value);
+
+	virtual void Jump() override;
 			
 
 protected:
@@ -65,6 +84,8 @@ protected:
 	void Climb(const FInputActionValue& Value);
 
 	void CancelClimb(const FInputActionValue& Value);
+
+	void Tick(float DeltaTime) override;
 
 public:
 	/** Returns CameraBoom subobject **/

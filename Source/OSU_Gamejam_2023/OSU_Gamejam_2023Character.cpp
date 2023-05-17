@@ -9,6 +9,8 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "MyCharacterMovementComponent.h"
 #include "EnhancedInputComponent.h"
+#include "ECustomMovement.h"
+#include "PhysicsEngine/RadialForceComponent.h"
 #include "EnhancedInputSubsystems.h"
 
 //////////////////////////////////////////////////////////////////////////
@@ -51,6 +53,48 @@ AOSU_Gamejam_2023Character::AOSU_Gamejam_2023Character(const FObjectInitializer&
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
 	MovementComponent = Cast<UMyCharacterMovementComponent>(GetCharacterMovement()); // <--
+
+	Hook_force = CreateDefaultSubobject<URadialForceComponent>(TEXT("Hook"));
+	
+	Hook_force->Radius = 50000;
+	Hook_force->Activate(false);
+	Hook_force->ForceStrength = 10;
+	Hook_force->ImpulseStrength = -20;
+	Hook_force->bIgnoreOwningActor = false;
+	Hook_force->bImpulseVelChange = true;
+	HookQueryParams.AddIgnoredActor(this);
+}
+
+void AOSU_Gamejam_2023Character::Try_hook()
+{
+	//FVector Start = Hook_start->GetComponentLocation();
+	FVector Start = GetActorLocation();
+	FVector End = FollowCamera->GetForwardVector() * 5000 + Start;
+
+
+	GetWorld()->LineTraceSingleByChannel(HookHit, Start, End, ECC_WorldStatic, HookQueryParams);
+	if (HookHit.bBlockingHit) {
+		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, TEXT("Is_hook"));
+		DrawDebugLine(GetWorld(), Start, HookHit.Location, FColor::Red, false, 1, 0, 5);
+		
+		Hook_force->SetWorldLocation(HookHit.Location, false, tmp_hit, ETeleportType::ResetPhysics);
+		Hook_force->Activate(true);
+		MovementComponent->SetMovementMode(EMovementMode::MOVE_Custom, ECustomMovementMode::CMOVE_Hooking);
+
+		/*CustomMovementComponent->Is_hooking = true;
+		CustomMovementComponent->SetMovementMode(EMovementMode::MOVE_Custom, ECustomMovementMode::CMOVE_Hooking);
+		CustomMovementComponent->bOrientRotationToMovement = false;*/
+	}
+}
+
+void AOSU_Gamejam_2023Character::Stop_hook()
+{
+	if (HookHit.bBlockingHit) {
+		Hook_force->Activate(false);
+
+		MovementComponent->SetMovementMode(MOVE_Falling);
+	}
+
 }
 
 void AOSU_Gamejam_2023Character::BeginPlay()
@@ -88,11 +132,20 @@ void AOSU_Gamejam_2023Character::CancelClimb(const FInputActionValue& Value)
 	bool climb = Value.Get<bool>();
 
 	if (climb) {
-		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, TEXT("Some debug message!"));
+		
 		MovementComponent->CancelClimbing();
 	}
 
 	
+}
+
+void AOSU_Gamejam_2023Character::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	if (MovementComponent->IsHooking()) {
+		Hook_force->FireImpulse();
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -164,6 +217,23 @@ void AOSU_Gamejam_2023Character::Look(const FInputActionValue& Value)
 		AddControllerYawInput(LookAxisVector.X);
 		AddControllerPitchInput(LookAxisVector.Y);
 	}
+}
+
+void AOSU_Gamejam_2023Character::Jump()
+{
+	
+
+
+	if (MovementComponent->IsClimbing()) {
+
+		//GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, TEXT("Dash"));
+		MovementComponent->TryClimbDashing();
+
+	}
+	else {
+		Super::Jump();
+	}
+
 }
 
 

@@ -21,6 +21,9 @@ public:
 		bool IsClimbing() const;
 
 	UFUNCTION(BlueprintPure)
+		bool IsHooking();
+
+	UFUNCTION(BlueprintPure)
 		bool IsClimbDashing() const;
 
 	UFUNCTION(BlueprintPure)

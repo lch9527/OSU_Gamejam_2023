@@ -6,5 +6,6 @@ UENUM(BlueprintType)
 enum ECustomMovementMode
 {
 	CMOVE_Climbing      UMETA(DisplayName = "Climbing"),
+	CMOVE_Hooking       UMETA(DisplayName = "Hooking"),
 	CMOVE_MAX			UMETA(Hidden),
 };

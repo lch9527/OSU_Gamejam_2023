@@ -139,6 +139,10 @@ void UMyCharacterMovementComponent::PhysCustom(float deltaTime, int32 Iterations
 	{
 		PhysClimbing(deltaTime, Iterations);
 	}
+	else if (CustomMovementMode == ECustomMovementMode::CMOVE_Hooking) 
+	{
+		PhysFlying(deltaTime, Iterations);
+	}
 
 	Super::PhysCustom(deltaTime, Iterations);
 }
@@ -475,6 +479,12 @@ bool UMyCharacterMovementComponent::IsClimbing() const
 {
 	return MovementMode == EMovementMode::MOVE_Custom && CustomMovementMode == ECustomMovementMode::CMOVE_Climbing;
 }
+
+bool UMyCharacterMovementComponent::IsHooking()
+{
+	return MovementMode == EMovementMode::MOVE_Custom && CustomMovementMode == ECustomMovementMode::CMOVE_Hooking;
+}
+
 
 bool UMyCharacterMovementComponent::IsClimbDashing() const
 {
