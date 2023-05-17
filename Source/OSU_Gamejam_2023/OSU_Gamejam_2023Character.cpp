@@ -174,6 +174,18 @@ void AOSU_Gamejam_2023Character::SetupPlayerInputComponent(class UInputComponent
 
 }
 
+FCollisionQueryParams AOSU_Gamejam_2023Character::GetIgnoreCharacterParams()
+{
+	FCollisionQueryParams Params;
+
+	TArray<AActor*> CharacterChildren;
+	GetAllChildActors(CharacterChildren);
+	Params.AddIgnoredActors(CharacterChildren);
+	Params.AddIgnoredActor(this);
+
+	return Params;
+}
+
 void AOSU_Gamejam_2023Character::Move(const FInputActionValue& Value)
 {
 	// input is a Vector2D
