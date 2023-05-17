@@ -491,9 +491,13 @@ void UMyCharacterMovementComponent::UpdateCharacterStateBeforeMovement(float Del
 
 bool UMyCharacterMovementComponent::TryWallRun()
 {
+	GEngine->AddOnScreenDebugMessage(-1, 0.1f, FColor::Yellow, TEXT("wall run"));
 	if (!IsFalling()) return false;
+	
 	if (Velocity.SizeSquared2D() < pow(MinWallRunSpeed, 2)) return false;
+	
 	if (Velocity.Z < -MaxVerticalWallRunSpeed) return false;
+	
 	FVector Start = UpdatedComponent->GetComponentLocation();
 	FVector LeftEnd = Start - UpdatedComponent->GetRightVector() * CapR() * 2;
 	FVector RightEnd = Start + UpdatedComponent->GetRightVector() * CapR() * 2;
@@ -502,6 +506,7 @@ bool UMyCharacterMovementComponent::TryWallRun()
 	// Check Player Height
 	if (GetWorld()->LineTraceSingleByProfile(FloorHit, Start, Start + FVector::DownVector * (CapHH() + MinWallRunHeight), "BlockAll", Params))
 	{
+		
 		return false;
 	}
 
@@ -509,6 +514,7 @@ bool UMyCharacterMovementComponent::TryWallRun()
 	GetWorld()->LineTraceSingleByProfile(WallHit, Start, LeftEnd, "BlockAll", Params);
 	if (WallHit.IsValidBlockingHit() && (Velocity | WallHit.Normal) < 0)
 	{
+		
 		Safe_bWallRunIsRight = false;
 	}
 	// Right Cast
@@ -521,6 +527,7 @@ bool UMyCharacterMovementComponent::TryWallRun()
 		}
 		else
 		{
+			
 			return false;
 		}
 	}
@@ -531,7 +538,7 @@ bool UMyCharacterMovementComponent::TryWallRun()
 	Velocity = ProjectedVelocity;
 	Velocity.Z = FMath::Clamp(Velocity.Z, 0.f, MaxVerticalWallRunSpeed);
 	SetMovementMode(MOVE_Custom, CMOVE_WallRun);
-	
+	GEngine->AddOnScreenDebugMessage(-1, 0.1f, FColor::Yellow, TEXT("111"));
 	return true;
 }
 
@@ -561,7 +568,7 @@ void UMyCharacterMovementComponent::PhysWallRun(float deltaTime, int32 Iteration
 
 		FVector Start = UpdatedComponent->GetComponentLocation();
 		FVector CastDelta = UpdatedComponent->GetRightVector() * CapR() * 2;
-		FVector End = Start + CastDelta;
+		FVector End = Safe_bWallRunIsRight ? Start + CastDelta : Start - CastDelta;
 		auto Params = ZippyCharacterOwner->GetIgnoreCharacterParams();
 		float SinPullAwayAngle = FMath::Sin(FMath::DegreesToRadians(WallRunPullAwayAngle));
 		FHitResult WallHit;
@@ -614,7 +621,7 @@ void UMyCharacterMovementComponent::PhysWallRun(float deltaTime, int32 Iteration
 
 	FVector Start = UpdatedComponent->GetComponentLocation();
 	FVector CastDelta = UpdatedComponent->GetRightVector() * CapR() * 2;
-	FVector End = Start + CastDelta;
+	FVector End = Safe_bWallRunIsRight ? Start + CastDelta : Start - CastDelta;
 	auto Params = ZippyCharacterOwner->GetIgnoreCharacterParams();
 	FHitResult FloorHit, WallHit;
 	GetWorld()->LineTraceSingleByProfile(WallHit, Start, End, "BlockAll", Params);
